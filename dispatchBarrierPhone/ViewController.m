@@ -99,6 +99,49 @@
     NSLog(@"group_notify外面的");
 }
 
+/*
+ * 1、这个可以模拟多个异步任务，然后每个任务之间还需要按照顺序的执行
+ * 2、通过NSOperation来控制A、B、C的执行顺序
+ * 3、通过信号量来控制器某一个任务的异步执行的时候，什么时候这个任务执行完毕
+ */
+- (void)useNSOpeationAndSemaphoreSignal
+{
+    NSBlockOperation *blockOperation1 = [NSBlockOperation blockOperationWithBlock:^{
+        dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            NSLog(@"%@",@"operation1");
+            dispatch_semaphore_signal(semaphore);
+        });
+        dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+    }];
+    
+    NSBlockOperation *blockOperation2 = [NSBlockOperation blockOperationWithBlock:^{
+        NSLog(@"%@",@"operation2");
+    }];
+    
+    NSBlockOperation *blockOperation3 = [NSBlockOperation blockOperationWithBlock:^{
+        dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            NSLog(@"%@",@"operation3");
+            dispatch_semaphore_signal(semaphore);
+        });
+        dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+    }];
+    
+    NSBlockOperation *blockOperation4 = [NSBlockOperation blockOperationWithBlock:^{
+        NSLog(@"%@",@"operation4");
+    }];
+    [blockOperation2 addDependency:blockOperation1];
+    [blockOperation3 addDependency:blockOperation2];
+    [blockOperation4 addDependency:blockOperation3];
+    
+    NSOperationQueue *quere = [NSOperationQueue new];
+    [quere addOperation:blockOperation1];
+    [quere addOperation:blockOperation2];
+    [quere addOperation:blockOperation3];
+    [quere addOperation:blockOperation4];
+}
+
 - (void)getHotCultureList:(void(^)())finish{
     dispatch_queue_t newQueue = dispatch_queue_create("com.instashop.log.new", DISPATCH_QUEUE_CONCURRENT);
     dispatch_async(newQueue, ^{
